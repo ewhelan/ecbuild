@@ -4,7 +4,7 @@ on:
   push:
     branches: [develop, master]
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 concurrency:
@@ -56,11 +56,10 @@ jobs:
           client-id: ${{ secrets.CI_PERMISSIONS_APP_CLIENT_ID }}
           private-key: ${{ secrets.CI_PERMISSIONS_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-      - uses: ecmwf/ci-infrastructure/actions/checkout-under-test@main
+      - uses: actions/checkout@v6
       - id: r
         uses: ecmwf/ci-infrastructure/actions/resolve-deps@main
         with:
-          current-branch: ${{ github.head_ref || github.ref_name }}
           matrix: build,test,build-hpc
           token: ${{ steps.mint.outputs.token }}
           client-id: ${{ secrets.CI_PERMISSIONS_APP_CLIENT_ID }}
@@ -78,14 +77,15 @@ jobs:
     steps:
       - name: Announce image
         uses: ecmwf/ci-infrastructure/actions/announce-image@main
-      - uses: ecmwf/ci-infrastructure/actions/checkout-under-test@main
+      - uses: actions/checkout@v6
 
       - name: Build ecbuild
         id: build
-        uses: ./.github/actions/build-ecbuild
+        uses: ecmwf/ci-infrastructure/actions/run-job-script@main
         with:
-          build-type: ${{ matrix.build-type }}
-          c-compiler: ${{ matrix.c-compiler }}
+          job-script: ${{ matrix.job-script }}
+          matrix-leg: ${{ toJSON(matrix) }}
+          package: ecbuild
 
       - name: Publish ecbuild
         uses: ecmwf/ci-infrastructure/actions/publish-artifact@main
@@ -105,7 +105,7 @@ jobs:
     steps:
       - name: Announce image
         uses: ecmwf/ci-infrastructure/actions/announce-image@main
-      - uses: ecmwf/ci-infrastructure/actions/checkout-under-test@main
+      - uses: actions/checkout@v6
 
       - name: Test ecbuild
         uses: ./.github/actions/test-ecbuild
@@ -127,13 +127,13 @@ jobs:
     steps:
       - name: Announce image
         uses: ecmwf/ci-infrastructure/actions/announce-image@main
-      - uses: ecmwf/ci-infrastructure/actions/checkout-under-test@main
+      - uses: actions/checkout@v6
 
       - name: Build ecbuild on HPC
         uses: ecmwf/ci-infrastructure/actions/build-on-hpc@main
         with:
           site: ${{ matrix.site }}
-          job-script: ${{ matrix.job-script || './.ci/hpc/build.sh.j2' }}
+          job-script: ${{ matrix.job-script }}
           # The render context for the .j2 recipe: the toolchain this leg declares.
           matrix-leg: ${{ toJSON(matrix) }}
           artifact-name: ${{ matrix._resolved.own-artifact-name }}
